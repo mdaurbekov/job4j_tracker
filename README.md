@@ -1,13 +1,2 @@
 # job4j_tracker
-# job4j_tracker
-# job4j_tracker
-# job4j_tracker
-# job4j_tracker
-# job4j_tracker
-# job4j_tracker
-# job4j_tracker
-# job4j_tracker
-# job4j_tracker
-# job4j_tracker
-# job4j_tracker
-# job4j_tracker
+Tracker - программа для ведения учета данных с доступными операциями: добавления, удаления, поиска и замены.  
