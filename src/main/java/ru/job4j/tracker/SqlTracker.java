@@ -1,5 +1,7 @@
 package ru.job4j.tracker;
 
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
 import ru.job4j.tracker.model.Item;
 
 import java.io.InputStream;
@@ -11,6 +13,7 @@ import java.util.Properties;
 public class SqlTracker implements Store, AutoCloseable {
 
     private Connection cn;
+    private static final Logger LOG = LogManager.getLogger(SqlTracker.class.getName());
 
     public void init() {
         try (InputStream in = SqlTracker.class.getClassLoader().getResourceAsStream("app.properties")) {
@@ -36,38 +39,43 @@ public class SqlTracker implements Store, AutoCloseable {
 
     @Override
     public Item add(Item item) {
-        try (PreparedStatement ps = cn.prepareStatement("insert into tracker (name, created) values (?, ?)")) {
+        try (PreparedStatement ps = cn.prepareStatement("insert into items (name, created) values (?, ?)", Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, item.getName());
             ps.setTimestamp(2, new Timestamp(System.currentTimeMillis()));
             ps.execute();
+            try (ResultSet generatedKeys = ps.getGeneratedKeys()) {
+                if (generatedKeys.next()) {
+                    item.setId(generatedKeys.getInt(1));
+                }
+            }
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            LOG.info(e.getMessage());
         }
         return item;
     }
 
     @Override
     public boolean replace(int id, Item item) {
-        boolean rezult;
-        try (PreparedStatement ps = cn.prepareStatement("update tracker set name = ? where id = ?")) {
+        boolean rezult = false;
+        try (PreparedStatement ps = cn.prepareStatement("update items set name = ?, created = ? where id = ?")) {
             ps.setString(1, item.getName());
-            ps.setInt(2, id);
-            ps.execute();
+            ps.setTimestamp(2, new Timestamp(System.currentTimeMillis()));
+            ps.setInt(3, id);
             rezult = ps.executeUpdate() > 0;
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            LOG.info(e.getMessage());
         }
         return rezult;
     }
 
     @Override
     public boolean delete(int id) {
-        boolean rezult;
-        try (PreparedStatement ps = cn.prepareStatement("delete from tracker where id = ?")) {
+        boolean rezult = false;
+        try (PreparedStatement ps = cn.prepareStatement("delete from items where id = ?")) {
             ps.setInt(1, id);
             rezult = ps.executeUpdate() > 0;
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            LOG.info(e.getMessage());
         }
         return rezult;
     }
@@ -75,18 +83,14 @@ public class SqlTracker implements Store, AutoCloseable {
     @Override
     public List<Item> findAll() {
         List<Item> items = new ArrayList<>();
-        try (PreparedStatement ps = cn.prepareStatement("select * from tracker")) {
+        try (PreparedStatement ps = cn.prepareStatement("select * from items")) {
             try (ResultSet resultSet = ps.executeQuery()) {
                 while (resultSet.next()) {
-                    items.add(new Item(
-                            resultSet.getInt("id"),
-                            resultSet.getString("name"),
-                            Timestamp.valueOf(resultSet.getString("created")).toLocalDateTime()
-                    ));
+                    items.add(getItem(resultSet));
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            LOG.info(e.getMessage());
         }
         return items;
     }
@@ -94,36 +98,43 @@ public class SqlTracker implements Store, AutoCloseable {
     @Override
     public List<Item> findByName(String key) {
         List<Item> items = new ArrayList<>();
-        try (PreparedStatement ps = cn.prepareStatement("select * from tracker where name = ?")) {
+        try (PreparedStatement ps = cn.prepareStatement("select * from items where name = ?")) {
             ps.setString(1, key);
             try (ResultSet resultSet = ps.executeQuery()) {
                 while (resultSet.next()) {
-                    items.add(new Item(
-                            resultSet.getInt("id"),
-                            resultSet.getString("name"),
-                            Timestamp.valueOf(resultSet.getString("created")).toLocalDateTime()
-                    ));
+                    items.add(getItem(resultSet));
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            LOG.info(e.getMessage());
         }
         return items;
     }
 
     @Override
     public Item findById(int id) {
-        Item rezult;
-        try (PreparedStatement ps = cn.prepareStatement("select * from tracker where id = ?")) {
+        Item rezult = null;
+        try (PreparedStatement ps = cn.prepareStatement("select * from items where id = ?")) {
             ps.setInt(1, id);
             try (ResultSet resultSet = ps.executeQuery()) {
-                resultSet.next();
-                rezult = new Item(resultSet.getInt("id"), resultSet.getString("name"), Timestamp.valueOf(resultSet.getString("created")).toLocalDateTime());
+                if (resultSet.next()) {
+                    rezult = getItem(resultSet);
+                }
             }
 
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            LOG.info(e.getMessage());
         }
         return rezult;
+    }
+
+    private Item getItem(ResultSet resultSet) {
+        Item item = null;
+        try {
+            item = new Item(resultSet.getInt("id"), resultSet.getString("name"), resultSet.getTimestamp("created").toLocalDateTime());
+        } catch (SQLException e) {
+            LOG.info(e.getMessage());
+        }
+        return item;
     }
 }
