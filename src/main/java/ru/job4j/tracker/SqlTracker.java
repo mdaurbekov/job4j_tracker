@@ -12,8 +12,8 @@ import java.util.Properties;
 
 public class SqlTracker implements Store, AutoCloseable {
 
-    private Connection cn;
     private static final Logger LOG = LogManager.getLogger(SqlTracker.class.getName());
+    private Connection cn;
 
     public void init() {
         try (InputStream in = SqlTracker.class.getClassLoader().getResourceAsStream("app.properties")) {
@@ -39,9 +39,10 @@ public class SqlTracker implements Store, AutoCloseable {
 
     @Override
     public Item add(Item item) {
-        try (PreparedStatement ps = cn.prepareStatement("insert into items (name, created) values (?, ?)", Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement ps = cn.prepareStatement("insert into items (name, created) values (?, ?)",
+                Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, item.getName());
-            ps.setTimestamp(2, new Timestamp(System.currentTimeMillis()));
+            ps.setTimestamp(2, Timestamp.valueOf(item.getCreated()));
             ps.execute();
             try (ResultSet generatedKeys = ps.getGeneratedKeys()) {
                 if (generatedKeys.next()) {
@@ -59,7 +60,7 @@ public class SqlTracker implements Store, AutoCloseable {
         boolean rezult = false;
         try (PreparedStatement ps = cn.prepareStatement("update items set name = ?, created = ? where id = ?")) {
             ps.setString(1, item.getName());
-            ps.setTimestamp(2, new Timestamp(System.currentTimeMillis()));
+            ps.setTimestamp(2, Timestamp.valueOf(item.getCreated()));
             ps.setInt(3, id);
             rezult = ps.executeUpdate() > 0;
         } catch (SQLException e) {
@@ -131,7 +132,9 @@ public class SqlTracker implements Store, AutoCloseable {
     private Item getItem(ResultSet resultSet) {
         Item item = null;
         try {
-            item = new Item(resultSet.getInt("id"), resultSet.getString("name"), resultSet.getTimestamp("created").toLocalDateTime());
+            item = new Item(resultSet.getInt("id"),
+                    resultSet.getString("name"),
+                    resultSet.getTimestamp("created").toLocalDateTime());
         } catch (SQLException e) {
             LOG.info(e.getMessage());
         }
