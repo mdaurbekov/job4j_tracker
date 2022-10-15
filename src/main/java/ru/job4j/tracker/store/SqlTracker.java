@@ -1,4 +1,4 @@
-package ru.job4j.tracker;
+package ru.job4j.tracker.store;
 
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
@@ -14,6 +14,13 @@ public class SqlTracker implements Store, AutoCloseable {
 
     private static final Logger LOG = LogManager.getLogger(SqlTracker.class.getName());
     private Connection cn;
+
+    public SqlTracker(Connection connection) {
+        cn = connection;
+    }
+
+    public SqlTracker() {
+    }
 
     public void init() {
         try (InputStream in = SqlTracker.class.getClassLoader().getResourceAsStream("app.properties")) {
